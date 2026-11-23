@@ -42,7 +42,7 @@ bootstrap: ## Install Flux and connect it to GitHub (needs GITHUB_TOKEN)
 	  --path=$(FLUX_PATH) --personal
 
 status: ## Show Flux sources and reconciliations
-	flux get all -A
+	flux --context=$(KUBE_CONTEXT) get all -A
 
 open: ## Open the sample app
 	open http://podinfo.localhost:8080
