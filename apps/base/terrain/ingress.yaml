@@ -1,0 +1,17 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: terrain
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: terrain.localhost
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: terrain
+                port:
+                  name: http
