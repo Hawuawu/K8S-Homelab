@@ -2,7 +2,7 @@
 CLUSTER        ?= lab
 KUBE_CONTEXT   ?= k3d-$(CLUSTER)
 GITHUB_OWNER   ?= Hawuawu
-GITHUB_REPO    ?= homelab
+GITHUB_REPO    ?= K8S-Homelab
 FLUX_PATH      ?= clusters/lab
 COLIMA_CPU     ?= 4
 COLIMA_MEMORY  ?= 8
