@@ -7,7 +7,9 @@ out=.tmp/rendered
 rm -rf "$out" && mkdir -p "$out"
 
 for dir in infrastructure/lab apps/lab; do
-  kubectl kustomize "$dir" > "$out/${dir//\//-}.yaml"
+  # Drop the top-level `sops:` metadata of encrypted Secrets: Flux consumes it, the Kubernetes schema does not know it.
+  kubectl kustomize "$dir" | awk '/^sops:/ { skip = 1; next } skip && /^[^[:space:]]/ { skip = 0 } !skip' \
+    > "$out/${dir//\//-}.yaml"
 done
 find clusters -name '*.yaml' -print0 | while IFS= read -r -d '' f; do
   cp "$f" "$out/$(echo "$f" | tr '/' '-')"
