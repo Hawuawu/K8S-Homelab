@@ -21,7 +21,7 @@ vm: ## Start the Colima Linux VM (Apple Virtualization framework)
 	colima status >/dev/null 2>&1 || colima start --vm-type vz --cpu $(COLIMA_CPU) --memory $(COLIMA_MEMORY) --disk $(COLIMA_DISK)
 
 cluster: ## Create the k3d cluster (1 server + 2 agents)
-	k3d cluster list $(CLUSTER) >/dev/null 2>&1 || k3d cluster create --config bootstrap/k3d-lab.yaml
+	k3d cluster list $(CLUSTER) >/dev/null 2>&1 || k3d cluster create $(CLUSTER) --config bootstrap/k3d-lab.yaml
 
 up: vm cluster ## Start the VM and create the cluster
 
