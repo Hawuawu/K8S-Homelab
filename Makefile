@@ -1,5 +1,6 @@
 # Home lab on a MacBook: Colima VM -> k3d (k3s in Docker) -> Flux syncing this repo from GitHub.
 CLUSTER        ?= lab
+KUBE_CONTEXT   ?= k3d-$(CLUSTER)
 GITHUB_OWNER   ?= Hawuawu
 GITHUB_REPO    ?= homelab
 FLUX_PATH      ?= clusters/lab
@@ -33,10 +34,11 @@ sops-key: ## Create the lab age key (once) and write its public key to .sops.yam
 bootstrap: ## Install Flux and connect it to GitHub (needs GITHUB_TOKEN)
 	@test -n "$$GITHUB_TOKEN" || (echo "export GITHUB_TOKEN first" && exit 1)
 	@test -f $(SOPS_AGE_KEY_FILE) || (echo "run 'make sops-key' first" && exit 1)
-	kubectl create namespace flux-system --dry-run=client -o yaml | kubectl apply -f -
-	kubectl -n flux-system create secret generic sops-age --from-file=age.agekey=$(SOPS_AGE_KEY_FILE) \
-	  --dry-run=client -o yaml | kubectl apply -f -
-	flux bootstrap github --owner=$(GITHUB_OWNER) --repository=$(GITHUB_REPO) --branch=main \
+	kubectl --context $(KUBE_CONTEXT) create namespace flux-system --dry-run=client -o yaml \
+	  | kubectl --context $(KUBE_CONTEXT) apply -f -
+	kubectl --context $(KUBE_CONTEXT) -n flux-system create secret generic sops-age \
+	  --from-file=age.agekey=$(SOPS_AGE_KEY_FILE) --dry-run=client -o yaml | kubectl --context $(KUBE_CONTEXT) apply -f -
+	flux bootstrap github --context=$(KUBE_CONTEXT) --owner=$(GITHUB_OWNER) --repository=$(GITHUB_REPO) --branch=main \
 	  --path=$(FLUX_PATH) --personal
 
 status: ## Show Flux sources and reconciliations
