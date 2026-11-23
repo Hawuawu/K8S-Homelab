@@ -1,0 +1,12 @@
+# Generated terrain tiles; each tile is built once from the Copernicus DEM, then served from here.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: tile-cache
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 10Gi
