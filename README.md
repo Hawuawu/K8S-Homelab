@@ -1,11 +1,11 @@
-# homelab
+# K8S-Homelab
 
-[![CI](https://github.com/Hawuawu/homelab/actions/workflows/ci.yml/badge.svg)](https://github.com/Hawuawu/homelab/actions/workflows/ci.yml)
-[![Security](https://github.com/Hawuawu/homelab/actions/workflows/security.yml/badge.svg)](https://github.com/Hawuawu/homelab/actions/workflows/security.yml)
-[![CodeQL](https://github.com/Hawuawu/homelab/actions/workflows/codeql.yml/badge.svg)](https://github.com/Hawuawu/homelab/actions/workflows/codeql.yml)
-![manifests](https://github.com/Hawuawu/homelab/raw/badges/manifests.svg)
-![tests](https://github.com/Hawuawu/homelab/raw/badges/tests.svg)
-![e2e](https://github.com/Hawuawu/homelab/raw/badges/e2e.svg)
+[![CI](https://github.com/Hawuawu/K8S-Homelab/actions/workflows/ci.yml/badge.svg)](https://github.com/Hawuawu/K8S-Homelab/actions/workflows/ci.yml)
+[![Security](https://github.com/Hawuawu/K8S-Homelab/actions/workflows/security.yml/badge.svg)](https://github.com/Hawuawu/K8S-Homelab/actions/workflows/security.yml)
+[![CodeQL](https://github.com/Hawuawu/K8S-Homelab/actions/workflows/codeql.yml/badge.svg)](https://github.com/Hawuawu/K8S-Homelab/actions/workflows/codeql.yml)
+![manifests](https://github.com/Hawuawu/K8S-Homelab/raw/badges/manifests.svg)
+![tests](https://github.com/Hawuawu/K8S-Homelab/raw/badges/tests.svg)
+![e2e](https://github.com/Hawuawu/K8S-Homelab/raw/badges/e2e.svg)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 A home Kubernetes lab that runs on a MacBook Air and is **operated entirely from GitHub**.
@@ -56,7 +56,7 @@ flowchart LR
 ```
 bootstrap/k3d-lab.yaml     cluster definition (nodes, k3s version, port 8080 -> ingress)
 clusters/lab/              what Flux applies: Kustomizations for infrastructure and apps
-                           (flux bootstrap adds clusters/lab/flux-system/)
+clusters/lab/flux-system/  Flux itself (generated, do not edit; see "Upgrading Flux")
 infrastructure/lab/        cluster-wide pieces: namespaces, later ingress/cert-manager/monitoring
 apps/base/<app>/           one folder per app
 apps/lab/                  which apps the lab runs
@@ -75,7 +75,17 @@ make open        # http://podinfo.localhost:8080
 
 `make bootstrap` uses `flux bootstrap github`; see the
 [Flux docs](https://fluxcd.io/flux/installation/bootstrap/github/) for the token it needs.
+`main` only accepts pull requests, so the Flux manifests are already committed and bootstrap has nothing to push:
+it installs Flux, adds a read-only deploy key and starts syncing.
 Back up the age key from `make sops-key` in a password manager: it is the only way to decrypt the lab's secrets.
+
+### Upgrading Flux
+
+Upgrade the CLI (`brew upgrade flux`), then regenerate the manifests in a pull request and merge it; Flux upgrades itself:
+
+```bash
+flux install --export > clusters/lab/flux-system/gotk-components.yaml
+```
 
 Day to day: `make stop` / `make start` (state is kept), `make status`, `make destroy` (Git still has everything).
 The lab only runs while the Mac is awake; Flux catches up after wake.

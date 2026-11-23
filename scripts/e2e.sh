@@ -7,7 +7,7 @@ cd "$(dirname "$0")/.."
 
 MODE=${MODE:-flux}
 CLUSTER=${CLUSTER:-lab}
-REPO_URL=${REPO_URL:-https://github.com/Hawuawu/homelab}
+REPO_URL=${REPO_URL:-https://github.com/Hawuawu/K8S-Homelab}
 GIT_BRANCH=${GIT_BRANCH:-main}
 GIT_SHA=${GIT_SHA:-}
 mkdir -p .tmp
