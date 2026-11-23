@@ -1,0 +1,16 @@
+checks:
+  addAllBuiltIn: true
+  exclude:
+    # Single-laptop lab: no dedicated nodes, HA replica counts or custom DNS.
+    - dnsconfig-options
+    - minimum-three-replicas
+    - no-node-affinity
+    # k3d's flannel SNATs cross-node pod traffic, so selector-based NetworkPolicies break ingress here.
+    - non-isolated-pod
+    # Deployments always use restartPolicy Always; the check expects it spelled out.
+    - restart-policy
+    # Key order follows the upstream Flux docs, not alphabetical order.
+    - sorted-keys
+    # Lab defaults: no ownership labels/annotations.
+    - required-annotation-email
+    - required-label-owner
