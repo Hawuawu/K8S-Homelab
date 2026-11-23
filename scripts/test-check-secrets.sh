@@ -32,11 +32,19 @@ secret > "$tmp/repo/apps/plain.yaml"
 expect 1 "plaintext Secret fails"
 rm "$tmp/repo/apps/plain.yaml"
 
+secret | sed 's/^kind: Secret$/kind: "Secret" # quoted/' > "$tmp/repo/apps/quoted.yaml"
+expect 1 "quoted plaintext Secret with a comment fails"
+rm "$tmp/repo/apps/quoted.yaml"
+
 secret > "$tmp/repo/apps/demo.sops.yaml"
 expect 1 "unencrypted *.sops.yaml fails"
 
 (cd "$tmp/repo" && sops --encrypt --in-place apps/demo.sops.yaml)
 expect 0 "SOPS-encrypted Secret passes"
+
+{ cat "$tmp/repo/apps/demo.sops.yaml"; echo '---'; secret; } > "$tmp/repo/apps/mixed.yaml"
+expect 1 "plaintext Secret next to an encrypted document fails"
+rm "$tmp/repo/apps/mixed.yaml"
 
 if SOPS_AGE_KEY_FILE="$tmp/key.txt" sops --decrypt "$tmp/repo/apps/demo.sops.yaml" | grep -q 'password: hunter2'; then
   pass=$((pass + 1)); echo "ok   - encrypted Secret decrypts with the age key"

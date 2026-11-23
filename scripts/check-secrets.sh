@@ -4,9 +4,20 @@ set -euo pipefail
 root=${1:-$(cd "$(dirname "$0")/.." && pwd)}
 status=0
 
+# A YAML document is a plaintext Secret when it has a top-level `kind: Secret` (quoted or not) but no
+# top-level `sops:` block of its own; checked per document so metadata elsewhere in the file does not count.
+has_plaintext_secret() {
+  awk -v q="[\"']?" '
+    function flush() { if (secret && !sops) bad = 1; secret = sops = 0 }
+    /^---/ { flush(); next }
+    $0 ~ "^kind:[[:space:]]*" q "Secret" q "[[:space:]]*(#.*)?$" { secret = 1 }
+    /^sops:/ { sops = 1 }
+    END { flush(); exit !bad }' "$1"
+}
+
 while IFS= read -r -d '' f; do
   case "$f" in */.tmp/*|*/.git/*|*/flux-system/*) continue ;; esac
-  if grep -Eq '^kind:[[:space:]]*Secret[[:space:]]*$' "$f" && ! grep -Eq '^sops:' "$f"; then
+  if has_plaintext_secret "$f"; then
     echo "plaintext Secret: ${f#"$root"/} (encrypt it: sops --encrypt --in-place <file>.sops.yaml)"
     status=1
   fi
