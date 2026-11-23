@@ -1,0 +1,73 @@
+name: Security
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: '23 4 * * 1'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  sast:
+    name: SAST (Semgrep)
+    runs-on: ubuntu-latest
+    container: semgrep/semgrep
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: semgrep scan --config p/kubernetes --config p/github-actions --config p/secrets --metrics=off --error --exclude .tmp
+
+  iac:
+    name: IaC policy (kube-linter)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install kube-linter
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: scripts/install-tools.sh kube-linter
+      - name: Lint rendered manifests
+        run: |
+          mkdir -p .tmp/rendered
+          for dir in infrastructure/lab apps/lab; do kubectl kustomize "$dir" > ".tmp/rendered/${dir//\//-}.yaml"; done
+          cp clusters/lab/*.yaml .tmp/rendered/
+          kube-linter lint --config .kube-linter.yaml .tmp/rendered
+
+  secrets:
+    name: Secret scan (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: gitleaks (full history)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          scripts/install-tools.sh gitleaks
+          "$HOME/bin/gitleaks" git . --redact --verbose
+
+  dast:
+    name: DAST (OWASP ZAP baseline)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install k3d
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: scripts/install-tools.sh k3d
+      - name: Deploy the lab to k3d
+        env:
+          MODE: kustomize
+        run: scripts/e2e.sh
+      - name: ZAP baseline against the ingress
+        run: |
+          mkdir -p zap && chmod 777 zap && cp .zap/rules.tsv zap/
+          docker run --rm --network host --add-host podinfo.localhost:127.0.0.1 -v "$PWD/zap:/zap/wrk:rw" \
+            ghcr.io/zaproxy/zaproxy:stable \
+            zap-baseline.py -t http://podinfo.localhost:8080 -c rules.tsv -r report.html -J report.json
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: zap-report
+          path: zap/

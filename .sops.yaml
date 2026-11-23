@@ -1,0 +1,6 @@
+# Files named *.sops.yaml are encrypted with the lab's age key (only data/stringData).
+# `make sops-key` generates the key and writes its public recipient below.
+creation_rules:
+  - path_regex: .*\.sops\.ya?ml$
+    encrypted_regex: ^(data|stringData)$
+    age: age1phvdvn88wfup2g479699hy6h8yx0hfm4j0dzushegcm2a9ml33qqrltrdy

@@ -1,0 +1,99 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+env:
+  FLUX_VERSION: 2.10.1
+jobs:
+  lint:
+    name: Lint (yamllint, shellcheck)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: pip install --quiet yamllint==1.38.0 shellcheck-py==0.11.0.1
+      - run: yamllint --strict .
+      - run: shellcheck scripts/*.sh
+
+  validate:
+    name: Validate manifests + tooling tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install kubeconform, sops, age
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: scripts/install-tools.sh kubeconform sops age
+      - run: scripts/validate.sh
+      - run: scripts/check-secrets.sh
+      - run: scripts/test-check-secrets.sh
+      - name: Summary
+        run: |
+          {
+            echo "| check | result |"
+            echo "|---|---|"
+            echo "| manifests valid (kubeconform) | $(cat .tmp/valid-count) |"
+            echo "| tooling tests passed | $(cat .tmp/tests-passed) |"
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rendered-manifests
+          path: .tmp/
+
+  e2e:
+    name: E2E (k3d + Flux from GitHub)
+    needs: validate
+    # Flux clones this repository, so PRs from forks (whose commits are not here) are skipped.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      # Check out the same commit Flux reconciles (the PR head, not GitHub's test merge).
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: fluxcd/flux2/action@23dcfe98fe672acdf44ecd9c60cbac41b57f5de8 # v2.10.1
+        with:
+          version: ${{ env.FLUX_VERSION }}
+      - name: Install k3d, age
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: scripts/install-tools.sh k3d age
+      - name: Reconcile this commit with Flux and probe the sample app
+        env:
+          REPO_URL: ${{ github.server_url }}/${{ github.repository }}
+          GIT_BRANCH: ${{ github.head_ref || github.ref_name }}
+          GIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: scripts/e2e.sh
+
+  badges:
+    needs: [validate, e2e]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install kubeconform, sops, age
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: scripts/install-tools.sh kubeconform sops age
+      - name: Publish badges to the `badges` branch
+        run: |
+          scripts/validate.sh >/dev/null
+          scripts/test-check-secrets.sh >/dev/null
+          valid=$(cat .tmp/valid-count)
+          tests=$(cat .tmp/tests-passed)
+          mkdir -p /tmp/badges
+          scripts/badge.sh manifests "$valid valid" '#4c1' /tmp/badges/manifests.svg
+          scripts/badge.sh tests "$tests passed" '#4c1' /tmp/badges/tests.svg
+          scripts/badge.sh e2e "k3d + flux passing" '#4c1' /tmp/badges/e2e.svg
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git fetch origin badges && git checkout badges || git checkout --orphan badges
+          git rm -rfq . 2>/dev/null || true
+          cp /tmp/badges/*.svg .
+          git add manifests.svg tests.svg e2e.svg
+          git commit -qm "badges: $valid manifests valid, $tests tests passed" || exit 0
+          git push origin badges

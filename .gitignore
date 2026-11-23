@@ -1,0 +1,5 @@
+.DS_Store
+*.agekey
+keys.txt
+zap/
+.tmp/
